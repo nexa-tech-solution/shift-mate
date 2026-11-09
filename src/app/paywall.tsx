@@ -94,7 +94,7 @@ export default function Paywall() {
         <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: plan === 'pro' ? t.accent : t.ink, alignItems: 'center', justifyContent: 'center', marginBottom: space.lg }}>
           <Icon name={plan === 'pro' ? 'sparkle' : 'work'} size={30} color={plan === 'pro' ? t.onAccent : t.bg} />
         </View>
-        <T v="display" accessibilityRole="header">{plan === 'pro' ? 'ShiftMate Pro' : 'ShiftMate Business'}</T>
+        <T v="display" accessibilityRole="header">{plan === 'pro' ? 'Shiftly Pro' : 'Shiftly Business'}</T>
         <T v="body" muted style={{ marginTop: space.sm }}>
           {plan === 'pro'
             ? 'For people with more than one job, rotating schedules, or pay that isn’t just hours × rate.'
@@ -123,7 +123,7 @@ export default function Paywall() {
             </View>
             <T v="caption" muted>Business needs team accounts and sync, which we’re building now. Nothing is charged until it launches in the store.</T>
             {BUSINESS_CONTACT && (
-              <Button title="Notify me" kind="secondary" icon="bell" onPress={() => Linking.openURL(`mailto:${BUSINESS_CONTACT}?subject=${encodeURIComponent('ShiftMate Business waitlist')}`)} style={{ marginTop: space.xs }} />
+              <Button title="Notify me" kind="secondary" icon="bell" onPress={() => Linking.openURL(`mailto:${BUSINESS_CONTACT}?subject=${encodeURIComponent('Shiftly Business waitlist')}`)} style={{ marginTop: space.xs }} />
             )}
           </View>
         ) : isPremium ? (
@@ -134,7 +134,7 @@ export default function Paywall() {
         ) : !storeAvailable ? (
           <View style={{ padding: space.lg, borderRadius: radius.lg, backgroundColor: t.surface2, gap: 6 }}>
             <T v="headline">Purchases unavailable</T>
-            <T v="caption" muted>The App Store / Google Play isn’t reachable from this build. Install ShiftMate from the store to subscribe.</T>
+            <T v="caption" muted>The App Store / Google Play isn’t reachable from this build. Install Shiftly from the store to subscribe.</T>
           </View>
         ) : loading ? (
           <ActivityIndicator color={t.ink} style={{ marginVertical: space.xl }} />

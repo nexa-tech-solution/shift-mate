@@ -144,7 +144,7 @@ export default function Onboarding() {
       </ScrollView>
       {/* KeyboardAvoidingView owns paddingBottom, so the safe-area inset lives here */}
       <View style={{ paddingHorizontal: space.xl, paddingTop: space.sm, paddingBottom: Math.max(insets.bottom, space.lg) + space.sm }}>
-        <Button title={step === 0 ? 'Set up in a minute' : step === STEPS - 1 ? 'Start using ShiftMate' : 'Continue'} onPress={next} disabled={!canNext} />
+        <Button title={step === 0 ? 'Set up in a minute' : step === STEPS - 1 ? 'Start using Shiftly' : 'Continue'} onPress={next} disabled={!canNext} />
       </View>
     </KeyboardAvoidingView>
   );

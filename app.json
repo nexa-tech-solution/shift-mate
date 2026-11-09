@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ShiftMate",
+    "name": "Shiftly",
     "slug": "shiftmate",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -18,7 +18,7 @@
     "android": {
       "package": "com.shiftmate.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E0441C",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -37,8 +37,8 @@
       [
         "expo-calendar",
         {
-          "calendarPermission": "ShiftMate adds your shifts to the calendar you choose, such as your Google Calendar.",
-          "remindersPermission": "ShiftMate does not use your reminders."
+          "calendarPermission": "Shiftly adds your shifts to the calendar you choose, such as your Google Calendar.",
+          "remindersPermission": "Shiftly does not use your reminders."
         }
       ],
       "@react-native-community/datetimepicker",

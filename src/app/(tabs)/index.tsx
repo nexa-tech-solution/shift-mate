@@ -51,7 +51,7 @@ export default function Home() {
           <EmptyState
             icon="calendar"
             title="Nothing scheduled yet"
-            body={templates.length ? 'Tap a template to drop your next shift on the calendar.' : 'Add your next shift and ShiftMate will count down to it.'}
+            body={templates.length ? 'Tap a template to drop your next shift on the calendar.' : 'Add your next shift and Shiftly will count down to it.'}
             action={<Button title="Add a shift" icon="plus" onPress={() => router.push('/shift/quick')} />}
           />
         </Card>

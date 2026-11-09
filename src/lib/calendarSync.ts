@@ -11,7 +11,7 @@ import { addDays, todayYmd } from './time';
  */
 export async function writableCalendars() {
   const { granted } = await Cal.requestCalendarPermissions();
-  if (!granted) throw new Error('Allow ShiftMate to access your calendars in Settings, then try again.');
+  if (!granted) throw new Error('Allow Shiftly to access your calendars in Settings, then try again.');
   const all = await Cal.getCalendars(Cal.EntityTypes.EVENT);
   return all.filter((c) => c.allowsModifications).sort((a, b) => a.source.name.localeCompare(b.source.name) || a.title.localeCompare(b.title));
 }
@@ -35,7 +35,7 @@ async function run() {
       startDate: new Date(i.startsAt),
       endDate: new Date(i.endsAt),
       location: wp.get(i.workplaceId),
-      notes: [i.note, 'Added by ShiftMate'].filter(Boolean).join('\n\n'),
+      notes: [i.note, 'Added by Shiftly'].filter(Boolean).join('\n\n'),
     });
     ids.push(e.id);
   }

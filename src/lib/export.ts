@@ -60,7 +60,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:6px 4px;
 th{font-size:10px;text-transform:uppercase;color:#6b625a}td:nth-child(n+6){text-align:right}
 footer{margin-top:16px;color:#8a8178;font-size:9px}
 </style></head><body>
-<h1>ShiftMate report</h1><p>${esc(from)} – ${esc(to)}</p>
+<h1>Shiftly report</h1><p>${esc(from)} – ${esc(to)}</p>
 <div class="sum"><div>Shifts<b>${rows.length}</b></div><div>Scheduled<b>${sum(6).toFixed(2)}h</b></div><div>Worked<b>${sum(7).toFixed(2)}h</b></div><div>Est. gross<b>${esc(money(sum(8)))}</b></div></div>
 <table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table>
 <footer>Estimate before taxes and deductions, generated from your schedule. Not a payroll document.</footer>
@@ -70,7 +70,7 @@ footer{margin-top:16px;color:#8a8178;font-size:9px}
 export async function exportPdf(state: DataState, from: string, to: string, advanced: boolean) {
   const { uri } = await Print.printToFileAsync({ html: buildReportHtml(state, from, to, advanced) });
   if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is not available on this device.');
-  await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf', dialogTitle: `shiftmate-${from}-to-${to}.pdf` });
+  await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf', dialogTitle: `shiftly-${from}-to-${to}.pdf` });
 }
 
 async function share(name: string, content: string | Uint8Array, mimeType: string, UTI?: string) {
@@ -83,11 +83,11 @@ async function share(name: string, content: string | Uint8Array, mimeType: strin
 }
 
 export const exportCsv = (state: DataState, from: string, to: string, advanced: boolean) =>
-  share(`shiftmate-${from}-to-${to}.csv`, buildCsv(state, from, to, advanced), 'text/csv');
+  share(`shiftly-${from}-to-${to}.csv`, buildCsv(state, from, to, advanced), 'text/csv');
 
 export const exportXlsx = (state: DataState, from: string, to: string, advanced: boolean) =>
   share(
-    `shiftmate-${from}-to-${to}.xlsx`,
+    `shiftly-${from}-to-${to}.xlsx`,
     buildXlsx(buildRows(state, from, to, advanced, Date.now()), [5, 6, 7, 8]),
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'org.openxmlformats.spreadsheetml.sheet',
@@ -105,7 +105,7 @@ export const exportAs = (f: ExportFormat, state: DataState, from: string, to: st
 export const exportBackup = (state: DataState) => {
   const { settings, workplaces, templates, shifts, rotations, paychecks } = state;
   return share(
-    `shiftmate-backup-${new Date().toISOString().slice(0, 10)}.json`,
+    `shiftly-backup-${new Date().toISOString().slice(0, 10)}.json`,
     JSON.stringify({ app: 'shiftmate', version: 1, settings, workplaces, templates, shifts, rotations, paychecks }, null, 2),
     'application/json',
   );

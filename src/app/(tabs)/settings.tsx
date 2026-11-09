@@ -29,7 +29,7 @@ export default function Settings() {
 
   const toggleReminders = async (on: boolean) => {
     if (on && !(await requestReminderPermission())) {
-      Alert.alert('Notifications are off', 'Allow notifications for ShiftMate in Settings to get shift reminders.', [
+      Alert.alert('Notifications are off', 'Allow notifications for Shiftly in Settings to get shift reminders.', [
         { text: 'Not now', style: 'cancel' },
         { text: 'Open Settings', onPress: () => Linking.openSettings() },
       ]);
@@ -84,10 +84,10 @@ export default function Settings() {
       <Card style={{ marginTop: space.lg, backgroundColor: premium ? t.surface : t.ink, borderColor: premium ? t.line : t.ink, gap: space.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Icon name="sparkle" size={18} color={t.accent} />
-          <T v="title" color={premium ? t.ink : t.bg}>{premium ? 'ShiftMate Pro' : 'Go Pro'}</T>
+          <T v="title" color={premium ? t.ink : t.bg}>{premium ? 'Shiftly Pro' : 'Go Pro'}</T>
         </View>
         <T v="body" color={premium ? t.ink2 : t.bg + 'CC'}>
-          {premium ? 'Thanks for supporting ShiftMate. All features are unlocked.' : 'Rotations, multiple jobs, overtime & night rules, paycheck checks and CSV reports.'}
+          {premium ? 'Thanks for supporting Shiftly. All features are unlocked.' : 'Rotations, multiple jobs, overtime & night rules, paycheck checks and CSV reports.'}
         </T>
         {premium ? (
           <Button title="Manage subscription" kind="secondary" onPress={() => manageSubscriptions().catch(() => {})} />
@@ -177,7 +177,7 @@ export default function Settings() {
       </Group>
 
       <T v="caption" muted style={{ textAlign: 'center', marginTop: space.xl, paddingHorizontal: space.lg }}>
-        ShiftMate {Constants.expoConfig?.version} · Your data stays on this device.{'\n'}Earnings are estimates, not payroll or tax advice.
+        Shiftly {Constants.expoConfig?.version} · Your data stays on this device.{'\n'}Earnings are estimates, not payroll or tax advice.
       </T>
     </Screen>
   );

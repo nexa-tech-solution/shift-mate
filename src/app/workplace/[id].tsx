@@ -115,7 +115,7 @@ export default function WorkplaceEditor() {
       ) : (
         <>
           <T v="caption" muted style={{ marginBottom: space.sm, paddingHorizontal: 4 }}>
-            Set these to match your contract. ShiftMate doesn’t apply any country’s overtime law automatically.
+            Set these to match your contract. Shiftly doesn’t apply any country’s overtime law automatically.
           </T>
           <Group>
             <ToggleRow label="Daily overtime" value={on.daily} onChange={(daily) => setOn({ ...on, daily })} />
