@@ -1,13 +1,14 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Alert, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { Chip, T, Tap } from '@/components/ui';
 import { formatDate, formatDuration, formatTime } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
+import { getInstances, instanceOf, overlaps } from '@/lib/schedule';
 import { addDays, deviceTz, hmToMin, todayYmd } from '@/lib/time';
-import { useActiveWorkplaces } from '@/store/selectors';
+import { useActiveWorkplaces, useTemplateMap } from '@/store/selectors';
 import { blankShift, useStore } from '@/store/useStore';
 import { SHIFT_PALETTE, font, radius, space, useTheme } from '@/theme';
 
@@ -19,6 +20,7 @@ export default function QuickAdd() {
   const fmt = useStore((s) => s.settings.timeFormat);
   const workplaces = useActiveWorkplaces();
   const allTemplates = useStore((s) => s.templates);
+  const tm = useTemplateMap();
   const upsertShift = useStore((s) => s.upsertShift);
   const [date, setDate] = useState(params.date ?? todayYmd());
   const [wpId, setWpId] = useState(workplaces[0]?.id);
@@ -29,9 +31,19 @@ export default function QuickAdd() {
 
   const add = (tid: string) => {
     const tpl = templates.find((x) => x.id === tid)!;
-    upsertShift(blankShift({ workplaceId: tpl.workplaceId, date, start: tpl.start, end: tpl.end, breakMin: tpl.breakMin, color: tpl.color, title: tpl.name, templateId: tpl.id, tz: deviceTz() }));
-    haptic('success');
-    router.back();
+    const shift = blankShift({ workplaceId: tpl.workplaceId, date, start: tpl.start, end: tpl.end, breakMin: tpl.breakMin, color: tpl.color, title: tpl.name, templateId: tpl.id, tz: deviceTz() });
+    const save = () => {
+      upsertShift(shift);
+      haptic('success');
+      router.back();
+    };
+    const { shifts, rotations } = useStore.getState();
+    const clash = overlaps(instanceOf(shift), getInstances(shifts, rotations, tm, addDays(date, -1), addDays(date, 1)));
+    if (!clash.length) return save();
+    Alert.alert('Overlapping shift', `This overlaps “${clash[0].title}”.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Add anyway', onPress: save },
+    ]);
   };
 
   return (

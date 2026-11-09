@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, ScrollView, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeInRight, FadeOutLeft } from 'react-native-reanimated';
+import Animated, { Easing, Extrapolation, FadeInDown, FadeInRight, FadeOutLeft, interpolate, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { choose } from '@/components/choose';
 import { Icon } from '@/components/Icon';
@@ -69,8 +69,8 @@ export default function Onboarding() {
           </View>
         </View>
       )}
-      <ScrollView contentContainerStyle={{ flexGrow: 1, padding: space.xl }} keyboardShouldPersistTaps="handled">
-        <Animated.View key={step} entering={step ? FadeInRight.duration(280) : FadeIn.duration(500)} exiting={FadeOutLeft.duration(160)} style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, padding: space.xl }} keyboardShouldPersistTaps="handled" contentInsetAdjustmentBehavior="never">
+        <Animated.View key={step} entering={step ? FadeInRight.duration(280) : undefined} exiting={FadeOutLeft.duration(160)} style={{ flex: 1 }}>
           {step === 0 && <Welcome />}
 
           {step === 1 && (
@@ -81,7 +81,7 @@ export default function Onboarding() {
                 <View style={{ flex: 1 }}>
                   <Field label="Hourly rate" value={rate} onChangeText={setRate} keyboardType="decimal-pad" placeholder="0.00" />
                 </View>
-                <Tap onPress={() => choose('Currency', CURRENCIES.map((c) => ({ label: c, value: c })), setCurrency)} accessibilityLabel={`Currency ${currency}`} style={{ minHeight: 52, paddingHorizontal: 16, borderRadius: radius.md, backgroundColor: t.surface2, justifyContent: 'center' }}>
+                <Tap onPress={() => choose('Currency', CURRENCIES.map((c) => ({ label: c, value: c })), setCurrency, { search: true })} accessibilityLabel={`Currency ${currency}`} style={{ minHeight: 52, paddingHorizontal: 16, borderRadius: radius.md, backgroundColor: t.surface2, justifyContent: 'center' }}>
                   <T v="headline">{currency}</T>
                 </Tap>
               </View>
@@ -114,7 +114,7 @@ export default function Onboarding() {
                   ))}
                 </Group>
               ) : (
-                <T v="body" muted>No problem — you can add shifts manually or create templates later.</T>
+                <T v="body" muted>No problem. You can add shifts manually or create templates later.</T>
               )}
               <T v="caption" muted>
                 {presets.filter((p) => p.on).map((p) => `${p.name}: ${formatTime(p.start, settings.timeFormat)}–${formatTime(p.end, settings.timeFormat)}, ${formatDuration(((hmToMin(p.end) - hmToMin(p.start) + 1440) % 1440 || 1440) - p.breakMin)} paid`).join('\n')}
@@ -159,37 +159,60 @@ function Heading({ title, body }: { title: string; body: string }) {
   );
 }
 
-/** Fanned timecard stubs: the brand mark. */
+type Stub = { c: ShiftColor; rot: number; x: number; y: number; label: string; time: string; sub: string };
+const STUBS: Stub[] = [
+  // stepped so each stub's label and time stay readable, like cards in a wallet
+  { c: 'plum', rot: -4, x: -10, y: 0, label: 'Night', time: '22:00', sub: '8h · overnight' },
+  { c: 'ocean', rot: 3, x: 10, y: 80, label: 'Day', time: '09:00', sub: '7h 30m' },
+  { c: 'ember', rot: -1.5, x: 0, y: 160, label: 'Next shift', time: '14:00', sub: 'Starts in 2h 15m' },
+];
+const out = Easing.out(Easing.cubic);
+
+/** One stub: deals out of a neat stack into its fanned spot (reduced motion jumps straight to the end). */
+function FanStub({ k, i }: { k: Stub; i: number }) {
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withDelay(150 + i * 120, withTiming(1, { duration: 700, easing: out }));
+  }, [p, i]);
+  const style = useAnimatedStyle(() => ({
+    opacity: interpolate(p.value, [0, 0.35], [0, 1], Extrapolation.CLAMP),
+    transform: [
+      { translateX: k.x * p.value },
+      { translateY: interpolate(p.value, [0, 1], [STUBS[2].y + 40, k.y]) },
+      { rotate: `${k.rot * p.value}deg` },
+      { scale: interpolate(p.value, [0, 1], [0.92, 1]) },
+    ],
+  }));
+  const on = SHIFT_PALETTE[k.c].on;
+  return (
+    <Animated.View
+      style={[{ position: 'absolute', top: 0, width: 264, borderRadius: 24, padding: 18, gap: 6, backgroundColor: SHIFT_PALETTE[k.c].fill, shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 16, shadowOffset: { width: 0, height: 10 }, elevation: 6 }, style]}
+    >
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <T v="overline" color={on + 'CC'}>{k.label}</T>
+        <Icon name="clock" size={18} color={on} />
+      </View>
+      <T v="display" color={on} style={{ fontVariant: ['tabular-nums'] }}>{k.time}</T>
+      <T v="label" color={on + 'B3'}>{k.sub}</T>
+    </Animated.View>
+  );
+}
+
+/** Stacked timecard stubs: the brand mark. */
 function Welcome() {
   const t = useTheme();
-  const cards: { c: ShiftColor; rot: string; x: number; y: number; label: string; time: string; sub: string }[] = [
-    { c: 'plum', rot: '-9deg', x: -22, y: 0, label: 'Night', time: '22:00', sub: '8h · overnight' },
-    { c: 'ocean', rot: '6deg', x: 20, y: 62, label: 'Day', time: '09:00', sub: '7h 30m' },
-    { c: 'ember', rot: '-2deg', x: 0, y: 132, label: 'Next shift', time: '14:00', sub: 'Starts in 2h 15m' },
-  ];
   return (
-    <View style={{ flex: 1, justifyContent: 'space-between', paddingTop: space.lg }}>
-      <View style={{ height: 290, alignItems: 'center' }} importantForAccessibility="no-hide-descendants">
-        {cards.map((k, i) => (
-          // rotation sits on the wrapper: entering animations replace the animated view's own transform
-          <View key={k.label} style={{ position: 'absolute', top: k.y, transform: [{ translateX: k.x }, { rotate: k.rot }] }}>
-            <Animated.View
-              entering={FadeInDown.delay(100 + i * 130).springify().damping(15)}
-              style={{ width: 264, borderRadius: 24, padding: 18, gap: 6, backgroundColor: SHIFT_PALETTE[k.c].fill, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 6 }}
-            >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <T v="overline" color={SHIFT_PALETTE[k.c].on + 'CC'}>{k.label}</T>
-                <Icon name="clock" size={18} color={SHIFT_PALETTE[k.c].on} />
-              </View>
-              <T v="display" color={SHIFT_PALETTE[k.c].on} style={{ fontVariant: ['tabular-nums'] }}>{k.time}</T>
-              <T v="label" color={SHIFT_PALETTE[k.c].on + 'B3'}>{k.sub}</T>
-            </Animated.View>
-          </View>
-        ))}
+    <View style={{ flex: 1, justifyContent: 'space-between', paddingTop: space.md }}>
+      <View style={{ height: 300, alignItems: 'center' }} importantForAccessibility="no-hide-descendants">
+        {STUBS.map((k, i) => <FanStub key={k.label} k={k} i={i} />)}
       </View>
       <View style={{ gap: space.md, paddingBottom: space.lg }}>
-        <T v="hero" accessibilityRole="header" style={{ fontSize: 48, lineHeight: 50 }}>Shifts in.{'\n'}<T v="hero" color={t.accent} style={{ fontSize: 48, lineHeight: 50 }}>Pay out.</T></T>
-        <T v="body" muted style={{ fontSize: 17, lineHeight: 24 }}>Plan your shifts, track your hours and see what you’ll earn — every pay period.</T>
+        <Animated.View entering={FadeInDown.delay(450).duration(550).easing(out)}>
+          <T v="hero" accessibilityRole="header" style={{ fontSize: 48, lineHeight: 50 }}>Shifts in.{'\n'}<T v="hero" color={t.accent} style={{ fontSize: 48, lineHeight: 50 }}>Pay out.</T></T>
+        </Animated.View>
+        <Animated.View entering={FadeInDown.delay(580).duration(550).easing(out)}>
+          <T v="body" muted style={{ fontSize: 17, lineHeight: 24 }}>Plan your shifts, track your hours and see what you’ll earn every pay period.</T>
+        </Animated.View>
       </View>
     </View>
   );

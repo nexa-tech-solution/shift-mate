@@ -5,6 +5,9 @@ import { create } from 'zustand';
 
 export const ENTITLEMENT = 'premium';
 
+/** Off: no store, no paywall or Pro upsell, and every feature is unlocked. */
+export const PAYWALL_ENABLED = false;
+
 const apiKey = Platform.select({
   ios: process.env.EXPO_PUBLIC_RC_IOS_KEY,
   android: process.env.EXPO_PUBLIC_RC_ANDROID_KEY,
@@ -15,7 +18,7 @@ const apiKey = Platform.select({
  * Expo Go would run RevenueCat's preview mode, which fakes purchases — we refuse that.
  */
 export const storeAvailable =
-  !!apiKey && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient && Platform.OS !== 'web';
+  PAYWALL_ENABLED && !!apiKey && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient && Platform.OS !== 'web';
 
 interface PremiumState {
   isPremium: boolean;

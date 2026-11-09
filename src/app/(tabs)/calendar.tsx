@@ -1,16 +1,17 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { PanResponder, Pressable, StyleSheet, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { Alert, PanResponder, Pressable, StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, SlideInLeft, SlideInRight } from 'react-native-reanimated';
 import { ShiftRow, dayLabel } from '@/components/shift';
 import { Button, IconButton, Screen, Segmented, T, Tap } from '@/components/ui';
 import { formatDate, formatDuration, formatHours, formatMoney, formatTime } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
-import { paidMinutes } from '@/lib/schedule';
+import { getInstances, instanceOf, overlaps, paidMinutes } from '@/lib/schedule';
 import { addDays, DAY_MIN, eachDay, hmToMin, minToHM, startOfWeek, todayYmd, weekday } from '@/lib/time';
-import { useActiveWorkplaces, useInstances, useNow, usePeriodData } from '@/store/selectors';
-import type { ShiftInstance, YMD } from '@/store/types';
-import { useStore } from '@/store/useStore';
+import { useActiveWorkplaces, useInstances, useNow, usePeriodData, useTemplateMap } from '@/store/selectors';
+import type { Shift, ShiftInstance, YMD } from '@/store/types';
+import { uid, useStore } from '@/store/useStore';
 import { SHIFT_PALETTE, font, space, useTheme } from '@/theme';
 
 type Mode = 'month' | 'week';
@@ -125,7 +126,7 @@ export default function Calendar() {
             <T v="headline">{weekMin ? `${formatDuration(weekMin)} this week` : 'No hours this week'}</T>
             {weekPay > 0 && <T v="headline" color={t.money}>{formatMoney(weekPay, currency)}</T>}
           </View>
-          <T v="caption" muted>Drag across a day to draw a shift · tap a day to add · tap a shift to edit</T>
+          <T v="caption" muted>Drag across a day to draw a shift · tap a day to add · tap a shift to edit · hold a shift to move it</T>
         </View>
       ) : (
       <Animated.View key={selected} entering={FadeIn.duration(200)} style={{ marginTop: space.xl, gap: space.sm }}>
@@ -198,8 +199,11 @@ function MonthGrid({ from, to, month, selected, today, byDay, onSelect }: { from
 const ROW_H = 46;
 const LABEL_W = 46;
 const SNAP = 15;
+const SHADOW = { shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 6 };
 
 type Seg = { i: ShiftInstance; top: number; bottom: number };
+/** A shift being moved: picked up from row `row`, shifted by dMin minutes and dd days. */
+type Drag = Seg & { row: number; dMin: number; dd: number };
 
 /** Week as seven compact rows, each a horizontal time track. Drag across a track to draw a new shift. */
 function WeekRows({ from, today, now, instances }: { from: YMD; today: YMD; now: number; instances: ShiftInstance[] }) {
@@ -227,25 +231,58 @@ function WeekRows({ from, today, now, instances }: { from: YMD; today: YMD; now:
   const step = span > 14 * 60 ? 6 : span > 10 * 60 ? 4 : 2;
   const ticks: number[] = [];
   for (let h = Math.ceil(r0 / 60 / step) * step; h * 60 < r1; h += step) if (h * 60 > r0) ticks.push(h);
-  const hourLabel = (h: number) => (fmt === '24h' ? `${h}h` : h === 12 ? '12p' : h > 12 ? `${h - 12}p` : `${h}a`);
+  const hourLabel = (h: number) => (fmt === '24h' ? `${h}:00` : `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}`);
   const nowD = new Date(now);
   const nowMin = nowD.getHours() * 60 + nowD.getMinutes();
+  const tm = useTemplateMap();
+  const [drag, setDrag] = useState<Drag | null>(null);
+  // the gesture's end callback may hold an older render's closure
+  const dragRef = useRef<Drag | null>(null);
+  const onDrag = (g: Drag | null) => {
+    dragRef.current = g;
+    setDrag(g);
+  };
+  const onDrop = () => {
+    const g = dragRef.current;
+    onDrag(null);
+    if (g && (g.dMin || g.dd)) moveShift(g.i, g.dMin, g.dd);
+  };
+  // a rotation day becomes a standalone shift, like editing it would
+  const moveShift = (i: ShiftInstance, dMin: number, dd: number) => {
+    const s0 = hmToMin(i.start) + dMin;
+    const date = addDays(i.date, dd + Math.floor(s0 / DAY_MIN));
+    const { rotationId, startsAt: _a, endsAt: _b, ...base } = i;
+    const moved: Shift = { ...base, id: rotationId ? uid() : i.id, date, start: minToHM(s0), end: minToHM(hmToMin(i.end) + dMin) };
+    const save = () => {
+      const st = useStore.getState();
+      if (rotationId) st.detachOccurrence(rotationId, i.date, moved);
+      else st.upsertShift(moved);
+      haptic('success');
+    };
+    const st = useStore.getState();
+    const clash = overlaps(instanceOf(moved), getInstances(st.shifts, st.rotations, tm, addDays(date, -1), addDays(date, 1)).filter((o) => o.id !== i.id));
+    if (!clash.length) return save();
+    Alert.alert('Overlapping shift', `This overlaps “${clash[0].title}”.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Move anyway', onPress: save },
+    ]);
+  };
 
   return (
     <View>
       <View style={{ height: 16, marginLeft: LABEL_W, marginBottom: 4 }} importantForAccessibility="no-hide-descendants">
         {trackW > 0 && ticks.map((h) => (
-          <T key={h} v="caption" muted={2} style={{ position: 'absolute', left: ((h * 60 - r0) / span) * trackW - 10, width: 20, textAlign: 'center', fontSize: 10.5 }}>{hourLabel(h)}</T>
+          <T key={h} v="caption" muted={2} style={{ position: 'absolute', left: ((h * 60 - r0) / span) * trackW - 22, width: 44, textAlign: 'center', fontSize: 10.5 }}>{hourLabel(h)}</T>
         ))}
       </View>
-      {days.map((d) => (
-        <DayRow key={d} d={d} today={today} segs={segsFor(d)} r0={r0} r1={r1} ticks={ticks} trackW={trackW} onTrackW={setTrackW} nowMin={d === today ? nowMin : null} />
+      {days.map((d, row) => (
+        <DayRow key={d} d={d} row={row} today={today} segs={segsFor(d)} r0={r0} r1={r1} ticks={ticks} trackW={trackW} onTrackW={setTrackW} nowMin={d === today ? nowMin : null} drag={drag} onDrag={onDrag} onDrop={onDrop} />
       ))}
     </View>
   );
 }
 
-function DayRow({ d, today, segs, r0, r1, ticks, trackW, onTrackW, nowMin }: { d: YMD; today: YMD; segs: Seg[]; r0: number; r1: number; ticks: number[]; trackW: number; onTrackW: (w: number) => void; nowMin: number | null }) {
+function DayRow({ d, row, today, segs, r0, r1, ticks, trackW, onTrackW, nowMin, drag, onDrag, onDrop }: { d: YMD; row: number; today: YMD; segs: Seg[]; r0: number; r1: number; ticks: number[]; trackW: number; onTrackW: (w: number) => void; nowMin: number | null; drag: Drag | null; onDrag: (g: Drag | null) => void; onDrop: () => void }) {
   const t = useTheme();
   const fmt = useStore((s) => s.settings.timeFormat);
   const [draft, setDraft] = useState<{ a: number; b: number } | null>(null);
@@ -261,6 +298,29 @@ function DayRow({ d, today, segs, r0, r1, ticks, trackW, onTrackW, nowMin }: { d
   const total = segs.reduce((a, s) => a + s.bottom - s.top, 0);
   const isToday = d === today;
   const wk = weekday(d) === 0 || weekday(d) === 6;
+  // Pressable isn't gesture-aware: a drop would otherwise also open the shift
+  const [g] = useState({ lifted: false, last: '' });
+  const moveGesture = (seg: Seg) =>
+    Gesture.Pan()
+      .runOnJS(true)
+      .activateAfterLongPress(250)
+      .onStart(() => {
+        g.lifted = true;
+        g.last = '0,0';
+        haptic('heavy');
+        onDrag({ ...seg, row, dMin: 0, dd: 0 });
+      })
+      .onUpdate((e) => {
+        const dMin = Math.round(((e.translationX / Math.max(1, trackW)) * span) / SNAP) * SNAP;
+        const dd = Math.min(6 - row, Math.max(-row, Math.round(e.translationY / ROW_H)));
+        if (`${dMin},${dd}` === g.last) return;
+        g.last = `${dMin},${dd}`;
+        haptic('select');
+        onDrag({ ...seg, row, dMin, dd });
+      })
+      .onEnd(onDrop)
+      .onFinalize(() => drag && onDrag(null));
+  const ghost = drag && drag.row + drag.dd === row ? drag : null;
 
   const pan = useMemo(() => {
     const g0 = { start: 0, last: 0, down: 0 };
@@ -331,20 +391,30 @@ function DayRow({ d, today, segs, r0, r1, ticks, trackW, onTrackW, nowMin }: { d
           const w = Math.max(10, x(Math.min(bottom, r1)) - left);
           const c = SHIFT_PALETTE[i.color];
           return (
+            <GestureDetector key={i.id + d} gesture={moveGesture({ i, top, bottom })}>
             <Pressable
-              key={i.id + d}
-              onPress={() => openShift(i)}
+              onPressIn={() => (g.lifted = false)}
+              onPress={() => !g.lifted && openShift(i)}
               accessibilityRole="button"
               accessibilityLabel={`${i.title}, ${formatTime(i.start, fmt)} to ${formatTime(i.end, fmt)}`}
-              style={{ position: 'absolute', left, width: w, top: 3, bottom: 3, borderRadius: 7, backgroundColor: c.fill, justifyContent: 'center', paddingHorizontal: 6 }}
+              accessibilityHint="Opens the shift. Edit it there to change its time."
+              style={{ position: 'absolute', left, width: w, top: 3, bottom: 3, borderRadius: 7, backgroundColor: c.fill, justifyContent: 'center', paddingHorizontal: 6, opacity: drag?.i.id === i.id ? 0.35 : 1 }}
             >
               <T v="caption" color={c.on} numberOfLines={1} style={{ fontFamily: font.semibold, fontSize: 11 }}>
                 {w > 90 ? `${formatTime(i.start, fmt)}–${formatTime(i.end, fmt)}` : w > 40 ? formatTime(i.start, fmt) : ''}
                 {stacked > 1 ? `  ×${stacked}` : ''}
               </T>
             </Pressable>
+            </GestureDetector>
           );
         })}
+        {ghost && trackW > 0 && (
+          <View pointerEvents="none" style={{ position: 'absolute', left: x(ghost.top + ghost.dMin), width: Math.max(10, x(ghost.bottom) - x(ghost.top)), top: 3, bottom: 3, borderRadius: 7, backgroundColor: SHIFT_PALETTE[ghost.i.color].fill, justifyContent: 'center', paddingHorizontal: 6, ...SHADOW }}>
+            <T v="caption" color={SHIFT_PALETTE[ghost.i.color].on} numberOfLines={1} style={{ fontFamily: font.bold, fontSize: 11 }}>
+              {formatTime(minToHM(hmToMin(ghost.i.start) + ghost.dMin), fmt)}–{formatTime(minToHM(hmToMin(ghost.i.end) + ghost.dMin), fmt)}
+            </T>
+          </View>
+        )}
         {trackW > 0 && nowMin != null && nowMin > r0 && nowMin < r1 && (
           <View pointerEvents="none" style={{ position: 'absolute', left: x(nowMin) - 1, top: 0, bottom: 0, width: 2, backgroundColor: t.accent }} />
         )}

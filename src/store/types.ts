@@ -84,6 +84,8 @@ export interface Settings {
   reminders: { enabled: boolean; leadMinutes: number };
   haptics: boolean;
   onboarded: boolean;
+  /** Device calendar (e.g. a Google account's) that shifts are copied into, and the events ShiftMate created there. */
+  calendarSync?: { calendarId: string; title: string; eventIds: string[] };
 }
 
 /** A concrete shift on the calendar — either a stored Shift or a generated rotation occurrence. */

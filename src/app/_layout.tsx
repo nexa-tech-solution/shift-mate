@@ -8,6 +8,7 @@ import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ChoiceHost } from '@/components/choose';
+import { syncCalendar } from '@/lib/calendarSync';
 import { syncReminders } from '@/lib/notifications';
 import { initPurchases } from '@/lib/purchases';
 import { useStore } from '@/store/useStore';
@@ -21,6 +22,14 @@ useStore.subscribe((s, prev) => {
   if (s.shifts === prev.shifts && s.rotations === prev.rotations && s.templates === prev.templates && s.settings.reminders === prev.settings.reminders && s.settings.timeFormat === prev.settings.timeFormat && s.workplaces === prev.workplaces) return;
   clearTimeout(timer);
   timer = setTimeout(() => syncReminders(useStore.getState()).catch(() => {}), 600);
+});
+
+// Mirror shifts into the connected device/Google calendar once edits settle.
+let calTimer: ReturnType<typeof setTimeout> | undefined;
+useStore.subscribe((s, prev) => {
+  if (!s.settings.calendarSync || (s.shifts === prev.shifts && s.rotations === prev.rotations && s.templates === prev.templates && s.workplaces === prev.workplaces)) return;
+  clearTimeout(calTimer);
+  calTimer = setTimeout(() => syncCalendar().catch(() => {}), 1500);
 });
 
 export default function RootLayout() {
@@ -40,6 +49,8 @@ export default function RootLayout() {
     initPurchases();
     // reminders roll forward a month at a time; refresh on launch
     syncReminders(useStore.getState()).catch(() => {});
+    // the synced window rolls forward too
+    syncCalendar().catch(() => {});
   }, []);
 
   useEffect(() => {

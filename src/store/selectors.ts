@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { computeEarnings, periodFor, summarize, type Period } from '@/lib/pay';
-import { usePremium } from '@/lib/purchases';
+import { PAYWALL_ENABLED, usePremium } from '@/lib/purchases';
 import { getInstances, toWorked } from '@/lib/schedule';
 import { addDays } from '@/lib/time';
 import type { ShiftInstance, Workplace, YMD } from './types';
@@ -28,7 +28,7 @@ export function useNow(ms = 30_000) {
   return now;
 }
 
-export const useIsPremium = () => usePremium((s) => s.isPremium);
+export const useIsPremium = () => usePremium((s) => s.isPremium || !PAYWALL_ENABLED);
 
 /** Workplaces visible to the user — free tier only uses the first one. */
 export function useActiveWorkplaces(): Workplace[] {

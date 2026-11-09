@@ -5,7 +5,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { Icon } from '@/components/Icon';
 import { ShiftRow } from '@/components/shift';
 import { Button, Card, Chip, EmptyState, Field, Group, IconButton, Row, SectionHeader, Screen, T } from '@/components/ui';
-import { exportCsv, exportPdf } from '@/lib/export';
+import { EXPORT_FORMATS, exportAs } from '@/lib/export';
 import { formatDate, formatHours, formatMoney, formatRange } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
 import { hasAdvancedRules, periodFor, shiftPeriod } from '@/lib/pay';
@@ -87,7 +87,7 @@ export default function Pay() {
           </View>
         </Card>
         <T v="caption" muted style={{ marginTop: space.sm, paddingHorizontal: 4 }}>
-          Before taxes and deductions. An estimate from your schedule — not a payroll calculation.
+          Before taxes and deductions. An estimate from your schedule, not a payroll calculation.
         </T>
 
         {pd.instances.length > 0 && <DailyChart pd={pd} money={(n) => m(n, true)} />}
@@ -121,25 +121,21 @@ export default function Pay() {
         ) : (
           <Group>
             <Row icon="receipt" label="Compare with your real paycheck" locked onPress={() => router.push('/paywall')} />
-            <Row icon="share" label="Export period report (PDF / CSV)" locked onPress={() => router.push('/paywall')} last />
+            <Row icon="share" label="Export period report (PDF / Excel / CSV)" locked onPress={() => router.push('/paywall')} last />
           </Group>
         )}
         {premium && (
           <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.md }}>
-            <Button
-              title="PDF report"
-              kind="secondary"
-              icon="receipt"
-              style={{ flex: 1 }}
-              onPress={() => exportPdf(useStore.getState(), pd.period.start, pd.period.end, true).catch((e) => Alert.alert('Export failed', String(e.message ?? e)))}
-            />
-            <Button
-              title="CSV"
-              kind="secondary"
-              icon="share"
-              style={{ flex: 1 }}
-              onPress={() => exportCsv(useStore.getState(), pd.period.start, pd.period.end, true).catch((e) => Alert.alert('Export failed', String(e.message ?? e)))}
-            />
+            {EXPORT_FORMATS.map((f) => (
+              <Button
+                key={f.value}
+                title={f.value === 'pdf' ? 'PDF' : f.value === 'xlsx' ? 'Excel' : 'CSV'}
+                kind="secondary"
+                icon={f.value === 'pdf' ? 'receipt' : 'share'}
+                style={{ flex: 1 }}
+                onPress={() => exportAs(f.value, useStore.getState(), pd.period.start, pd.period.end, true).catch((e) => Alert.alert('Export failed', String(e.message ?? e)))}
+              />
+            ))}
           </View>
         )}
 
@@ -225,7 +221,7 @@ function PaycheckCompare({ workplaceId, periodStart, estimate }: { workplaceId: 
         </View>
       )}
       {diff != null && diff < -0.5 && (
-        <T v="caption" muted>Lower than expected. Check logged hours, breaks and your rate — or ask your employer.</T>
+        <T v="caption" muted>Lower than expected. Check logged hours, breaks and your rate, or ask your employer.</T>
       )}
     </Card>
   );

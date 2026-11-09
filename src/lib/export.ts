@@ -5,6 +5,7 @@ import type { DataState } from '@/store/useStore';
 import { formatMoney } from './format';
 import { computeEarnings } from './pay';
 import { getInstances, toWorked } from './schedule';
+import { buildXlsx } from './xlsx';
 
 const cell = (v: string | number) => {
   const s = String(v);
@@ -72,17 +73,34 @@ export async function exportPdf(state: DataState, from: string, to: string, adva
   await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf', dialogTitle: `shiftmate-${from}-to-${to}.pdf` });
 }
 
-async function share(name: string, content: string, mimeType: string) {
+async function share(name: string, content: string | Uint8Array, mimeType: string, UTI?: string) {
   const file = new File(Paths.cache, name);
   if (file.exists) file.delete();
   file.create();
   file.write(content);
   if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is not available on this device.');
-  await Sharing.shareAsync(file.uri, { mimeType, dialogTitle: name });
+  await Sharing.shareAsync(file.uri, { mimeType, UTI, dialogTitle: name });
 }
 
 export const exportCsv = (state: DataState, from: string, to: string, advanced: boolean) =>
   share(`shiftmate-${from}-to-${to}.csv`, buildCsv(state, from, to, advanced), 'text/csv');
+
+export const exportXlsx = (state: DataState, from: string, to: string, advanced: boolean) =>
+  share(
+    `shiftmate-${from}-to-${to}.xlsx`,
+    buildXlsx(buildRows(state, from, to, advanced, Date.now()), [5, 6, 7, 8]),
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'org.openxmlformats.spreadsheetml.sheet',
+  );
+
+export type ExportFormat = 'pdf' | 'xlsx' | 'csv';
+export const EXPORT_FORMATS: { label: string; value: ExportFormat }[] = [
+  { label: 'PDF report', value: 'pdf' },
+  { label: 'Excel (.xlsx)', value: 'xlsx' },
+  { label: 'CSV', value: 'csv' },
+];
+export const exportAs = (f: ExportFormat, state: DataState, from: string, to: string, advanced: boolean) =>
+  ({ pdf: exportPdf, xlsx: exportXlsx, csv: exportCsv })[f](state, from, to, advanced);
 
 export const exportBackup = (state: DataState) => {
   const { settings, workplaces, templates, shifts, rotations, paychecks } = state;

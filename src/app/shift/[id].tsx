@@ -65,8 +65,15 @@ export default function ShiftEditor() {
   const rateError = rateNum != null && !(rateNum >= 0) ? 'Enter a valid amount' : undefined;
   const started = inst.startsAt <= now;
 
-  const save = () => {
+  const save = (force = false) => {
     if (!s.title.trim() || rateError) return;
+    if (clash.length && !force) {
+      Alert.alert('Overlapping shift', `This overlaps “${clash[0].title}”.`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Save anyway', onPress: () => save(true) },
+      ]);
+      return;
+    }
     const out: Shift = { ...s, title: s.title.trim(), note: s.note?.trim() || undefined, rateOverride: premium ? rateNum : s.rateOverride };
     if (rotation && occDate) store.detachOccurrence(rotation.id, occDate, out);
     else store.upsertShift(out);
@@ -98,7 +105,7 @@ export default function ShiftEditor() {
 
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: t.bg }}>
-      <ModalHeader title={isNew ? 'New shift' : 'Edit shift'} onCancel={() => router.back()} onSave={save} saveDisabled={!s.title.trim() || !!rateError} />
+      <ModalHeader title={isNew ? 'New shift' : 'Edit shift'} onCancel={() => router.back()} onSave={() => save()} saveDisabled={!s.title.trim() || !!rateError} />
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: insets.bottom + space.xxl }} keyboardShouldPersistTaps="handled">
         {rotation && (
           <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', padding: space.md, borderRadius: 14, backgroundColor: t.surface2, marginBottom: space.lg }}>

@@ -55,4 +55,4 @@ export function formatCountdown(ms: number) {
   return `${Math.round(min / 1440)} days`;
 }
 
-export const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'MXN'];
+export const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'NZD', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'MXN', 'BRL', 'VND', 'JPY', 'KRW', 'CNY', 'HKD', 'TWD', 'SGD', 'MYR', 'THB', 'PHP', 'IDR', 'INR', 'AED', 'ZAR'];

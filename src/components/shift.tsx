@@ -1,5 +1,9 @@
-import { memo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { memo, useRef } from 'react';
+import { Alert, StyleSheet, View, useWindowDimensions } from 'react-native';
+import Swipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
+import Animated, { type SharedValue, useAnimatedReaction, useAnimatedStyle } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
+import { haptic } from '@/lib/haptics';
 import { formatCountdown, formatDate, formatDuration, formatMoney, formatTime } from '@/lib/format';
 import { paidMinutes } from '@/lib/schedule';
 import { todayYmd, addDays } from '@/lib/time';
@@ -35,34 +39,99 @@ export const ShiftRow = memo(function ShiftRow({
   const time = `${formatTime(shift.start, fmt)} – ${formatTime(shift.end, fmt)}`;
   const dur = formatDuration(paidMinutes(shift));
   const overnight = shift.end <= shift.start;
+  // a rotation day is detached, not the whole rotation
+  const askDelete = (close?: () => void) => {
+    haptic('warning');
+    Alert.alert(shift.rotationId ? 'Remove this day from the rotation?' : 'Delete shift?', shift.rotationId ? 'Other days in the rotation stay as they are.' : undefined, [
+      { text: 'Cancel', style: 'cancel', onPress: close },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          const st = useStore.getState();
+          if (shift.rotationId) st.detachOccurrence(shift.rotationId, shift.date);
+          else st.removeShift(shift.id);
+        },
+      },
+    ]);
+  };
+  const sw = useRef<SwipeableMethods>(null);
+  // RN Pressable doesn't know about the pan, so a drag released over the row would still count as a tap
+  const dragged = useRef(false);
+  const open = useRef(false);
+  const press = () => {
+    if (dragged.current) return;
+    if (open.current) return sw.current?.close();
+    onPress(shift);
+  };
   return (
-    <Tap
-      onPress={() => onPress(shift)}
-      scaleTo={0.98}
-      accessibilityLabel={`${shift.title}, ${showDate ? dayLabel(shift.date) + ', ' : ''}${time}, ${dur}${pay != null ? `, about ${formatMoney(pay, currency)}` : ''}`}
-      accessibilityHint="Opens the shift"
-      style={[styles.row, { backgroundColor: t.surface, borderColor: t.line }]}
+    <Swipeable
+      ref={sw}
+      onSwipeableOpenStartDrag={() => (dragged.current = true)}
+      onSwipeableCloseStartDrag={() => (dragged.current = true)}
+      onSwipeableWillOpen={() => (open.current = true)}
+      onSwipeableWillClose={() => (open.current = false)}
+      // card shape + red fill live on the clipping container: whatever the row uncovers is the delete surface
+      containerStyle={[styles.card, { borderColor: t.line, backgroundColor: t.danger }]}
+      friction={1}
+      rightThreshold={40}
+      overshootRight
+      animationOptions={{ mass: 1, stiffness: 380, damping: 38 }}
+      renderRightActions={(_p, tx, m) => <DeleteAction tx={tx} label={shift.title} onDelete={() => askDelete(m.close)} />}
     >
-      <View style={[styles.bar, { backgroundColor: c.fill }]} />
-      <View style={{ flex: 1, gap: 2 }}>
-        {showDate && <T v="overline" muted>{dayLabel(shift.date)}</T>}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <T v="headline" numberOfLines={1} style={{ flexShrink: 1 }}>{shift.title}</T>
-          {shift.rotationId && <Icon name="repeat" size={12} color={t.ink3} />}
-          {shift.actual && <Icon name="check" size={12} color={t.money} />}
+      <Tap
+        onPressIn={() => (dragged.current = false)}
+        onPress={press}
+        scaleTo={1}
+        accessibilityLabel={`${shift.title}, ${showDate ? dayLabel(shift.date) + ', ' : ''}${time}, ${dur}${pay != null ? `, about ${formatMoney(pay, currency)}` : ''}`}
+        accessibilityHint="Opens the shift"
+        accessibilityActions={[{ name: 'delete', label: 'Delete' }]}
+        onAccessibilityAction={(e) => e.nativeEvent.actionName === 'delete' && askDelete()}
+        style={[styles.row, { backgroundColor: t.surface }]}
+      >
+        <View style={[styles.bar, { backgroundColor: c.fill }]} />
+        <View style={{ flex: 1, gap: 2 }}>
+          {showDate && <T v="overline" muted>{dayLabel(shift.date)}</T>}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <T v="headline" numberOfLines={1} style={{ flexShrink: 1 }}>{shift.title}</T>
+            {shift.rotationId && <Icon name="repeat" size={12} color={t.ink3} />}
+            {shift.actual && <Icon name="check" size={12} color={t.money} />}
+          </View>
+          <T v="num" muted style={{ fontSize: 14, fontFamily: font.medium }}>
+            {time}
+            {overnight ? '  ·  overnight' : ''}
+          </T>
         </View>
-        <T v="num" muted style={{ fontSize: 14, fontFamily: font.medium }}>
-          {time}
-          {overnight ? '  ·  overnight' : ''}
-        </T>
-      </View>
-      <View style={{ alignItems: 'flex-end', gap: 2 }}>
-        <T v="num">{dur}</T>
-        {pay != null && <T v="num" color={t.money} style={{ fontSize: 13 }}>{formatMoney(pay, currency)}</T>}
-      </View>
-    </Tap>
+        <View style={{ alignItems: 'flex-end', gap: 2 }}>
+          <T v="num">{dur}</T>
+          {pay != null && <T v="num" color={t.money} style={{ fontSize: 13 }}>{formatMoney(pay, currency)}</T>}
+        </View>
+      </Tap>
+    </Swipeable>
   );
 });
+
+const ACTION_W = 84;
+
+/** Revealed delete button; the label rides the row's edge on a long drag, and a full swipe asks to delete straight away. */
+function DeleteAction({ tx, label, onDelete }: { tx: SharedValue<number>; label: string; onDelete: () => void }) {
+  const full = useWindowDimensions().width * 0.6;
+  useAnimatedReaction(
+    () => tx.value < -full,
+    (hit, was) => {
+      if (hit && !was) scheduleOnRN(onDelete);
+    },
+  );
+  const follow = useAnimatedStyle(() => ({ transform: [{ translateX: Math.min(0, tx.value + ACTION_W) }] }));
+  return (
+    <Tap onPress={onDelete} feedback="none" scaleTo={1} accessibilityLabel={`Delete ${label}`} style={styles.del}>
+      <Animated.View style={[{ alignItems: 'center', gap: 4 }, follow]}>
+        <Icon name="trash" size={18} color="#FFFFFF" />
+        <T v="label" color="#FFFFFF">Delete</T>
+      </Animated.View>
+    </Tap>
+  );
+}
 
 /**
  * Signature element: the next shift as a perforated timecard stub.
@@ -156,7 +225,9 @@ export function TintChip({ color, label }: { color: keyof typeof SHIFT_PALETTE; 
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, paddingLeft: space.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, minHeight: 64 },
+  card: { borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, paddingLeft: space.md, minHeight: 64 },
+  del: { width: ACTION_W, alignItems: 'center', justifyContent: 'center' },
   bar: { width: 4, alignSelf: 'stretch', borderRadius: 2 },
   ticket: { borderRadius: radius.xl, overflow: 'hidden' },
   badge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill },

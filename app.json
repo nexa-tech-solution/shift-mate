@@ -34,6 +34,13 @@
       "expo-sqlite",
       "expo-sharing",
       "expo-localization",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "ShiftMate adds your shifts to the calendar you choose, such as your Google Calendar.",
+          "remindersPermission": "ShiftMate does not use your reminders."
+        }
+      ],
       "@react-native-community/datetimepicker",
       [
         "expo-notifications",

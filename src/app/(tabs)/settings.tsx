@@ -5,11 +5,12 @@ import { Alert, Linking, View } from 'react-native';
 import { choose } from '@/components/choose';
 import { Icon } from '@/components/Icon';
 import { Button, Card, Group, Row, SectionHeader, Screen, Segmented, T, ToggleRow } from '@/components/ui';
-import { exportBackup, exportCsv } from '@/lib/export';
+import { connectCalendar, disconnectCalendar, syncCalendar, writableCalendars } from '@/lib/calendarSync';
+import { EXPORT_FORMATS, exportAs, exportBackup } from '@/lib/export';
 import { CURRENCIES } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
 import { requestReminderPermission } from '@/lib/notifications';
-import { manageSubscriptions, restore, storeAvailable } from '@/lib/purchases';
+import { manageSubscriptions, PAYWALL_ENABLED, restore, storeAvailable } from '@/lib/purchases';
 import { addDays, todayYmd } from '@/lib/time';
 import { useIsPremium } from '@/store/selectors';
 import { useStore } from '@/store/useStore';
@@ -51,11 +52,35 @@ export default function Settings() {
   };
 
   const fail = (e: unknown) => Alert.alert('Export failed', String((e as Error).message ?? e));
+  const calFail = (e: unknown) => Alert.alert('Calendar sync failed', String((e as Error).message ?? e));
+
+  const chooseCalendar = async () => {
+    const cals = await writableCalendars();
+    if (!cals.length) return Alert.alert('No calendars', 'Add a Google account to your phone first, then try again.');
+    choose('Add shifts to', cals.map((c) => ({ label: `${c.title} · ${c.source.name}`, value: c.id })), (id) => {
+      const c = cals.find((x) => x.id === id)!;
+      connectCalendar(c).then(() => haptic('success'), calFail);
+    }, { search: cals.length > 8 });
+  };
+  const pickCalendar = () => {
+    if (!settings.calendarSync) return chooseCalendar().catch(calFail);
+    choose(`Synced to ${settings.calendarSync.title}`, [
+      { label: 'Sync now', value: 'sync' },
+      { label: 'Change calendar', value: 'change' },
+      { label: 'Disconnect and remove events', value: 'off' },
+    ], (a) => {
+      if (a === 'sync') syncCalendar().then(() => haptic('success'), calFail);
+      else if (a === 'change') chooseCalendar().catch(calFail);
+      else disconnectCalendar().catch(calFail);
+    });
+  };
 
   return (
     <Screen>
       <T v="display" accessibilityRole="header">Settings</T>
 
+      {PAYWALL_ENABLED && (
+        <>
       <Card style={{ marginTop: space.lg, backgroundColor: premium ? t.surface : t.ink, borderColor: premium ? t.line : t.ink, gap: space.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Icon name="sparkle" size={18} color={t.accent} />
@@ -72,6 +97,8 @@ export default function Settings() {
       </Card>
       {storeAvailable && !premium && (
         <Button title="Restore purchases" kind="ghost" loading={restoring} onPress={doRestore} style={{ marginTop: space.xs }} />
+      )}
+        </>
       )}
 
       <SectionHeader title="Work" />
@@ -97,7 +124,7 @@ export default function Settings() {
 
       <SectionHeader title="Preferences" />
       <Group>
-        <Row icon="pay" label="Currency" value={settings.currency} onPress={() => choose('Currency', CURRENCIES.map((c) => ({ label: c, value: c })), (currency) => update({ currency }))} />
+        <Row icon="pay" label="Currency" value={settings.currency} onPress={() => choose('Currency', CURRENCIES.map((c) => ({ label: c, value: c })), (currency) => update({ currency }), { search: true })} />
         <View style={{ padding: space.lg, gap: space.md, borderBottomWidth: 0.5, borderBottomColor: t.line }}>
           <T v="label">Time format</T>
           <Segmented value={settings.timeFormat} onChange={(timeFormat) => update({ timeFormat })} options={[{ value: '12h', label: '1:00 PM' }, { value: '24h', label: '13:00' }]} accessibilityLabel="Time format" />
@@ -113,14 +140,27 @@ export default function Settings() {
         <ToggleRow icon="hand" label="Haptics" value={settings.haptics} onChange={(haptics) => update({ haptics })} last />
       </Group>
 
+      <SectionHeader title="Calendar" />
+      <Group>
+        <Row icon="calendar" label="Google Calendar" value={settings.calendarSync?.title ?? 'Off'} onPress={pickCalendar} last />
+      </Group>
+      <T v="caption" muted style={{ marginTop: space.sm, paddingHorizontal: space.xs }}>
+        Shifts are copied into a calendar on this phone. To see them in Google Calendar, add your Google account in your phone&apos;s Settings › Calendar › Accounts, then pick one of its calendars here.
+      </T>
+
       <SectionHeader title="Your data" />
       <Group>
         <Row icon="share" label="Export backup (JSON)" onPress={() => exportBackup(useStore.getState()).catch(fail)} />
         <Row
           icon="receipt"
-          label="Export shifts (CSV)"
+          label="Export shifts"
+          value="PDF, Excel, CSV"
           locked={!premium}
-          onPress={() => (premium ? exportCsv(useStore.getState(), addDays(todayYmd(), -365), addDays(todayYmd(), 90), true).catch(fail) : router.push('/paywall'))}
+          onPress={() =>
+            premium
+              ? choose('Export the last year and next 3 months', EXPORT_FORMATS, (f) => exportAs(f, useStore.getState(), addDays(todayYmd(), -365), addDays(todayYmd(), 90), true).catch(fail))
+              : router.push('/paywall')
+          }
         />
         <Row
           icon="trash"

@@ -25,11 +25,11 @@ export default function Rotations() {
           ))}
         </Group>
       ) : (
-        <EmptyState icon="repeat" title="No repeating schedule" body="Set your weekly pattern — or a custom rotation like 4-on-4-off — once, and it fills your calendar automatically." />
+        <EmptyState icon="repeat" title="No repeating schedule" body="Set your weekly pattern or a custom rotation like 4-on-4-off once, and it fills your calendar automatically." />
       )}
       <Button title="New rotation" icon="plus" disabled={!hasTemplates} onPress={() => open('new')} style={{ marginTop: space.xl }} />
       {!hasTemplates && (
-        <T v="caption" muted style={{ textAlign: 'center', marginTop: space.sm }}>Create a shift template first — rotations are built from templates.</T>
+        <T v="caption" muted style={{ textAlign: 'center', marginTop: space.sm }}>Create a shift template first. Rotations are built from templates.</T>
       )}
     </Screen>
   );
