@@ -58,6 +58,22 @@
             "backgroundColor": "#E0441C"
           }
         }
+      ],
+      [
+        "expo-widgets",
+        {
+          "enableAndroid": true,
+          "widgets": [
+            {
+              "name": "ClockWidget",
+              "displayName": "Shift clock",
+              "description": "Your clock-in timer and next shift.",
+              "ios": {
+                "supportedFamilies": ["systemSmall", "systemMedium"]
+              }
+            }
+          ]
+        }
       ]
     ],
     "experiments": {

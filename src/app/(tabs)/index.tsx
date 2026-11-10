@@ -1,12 +1,14 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ShiftRow, TicketCard } from '@/components/shift';
 import { Button, Card, EmptyState, IconButton, SectionHeader, Screen, T, Tap } from '@/components/ui';
-import { formatDate, formatHours, formatMoney } from '@/lib/format';
+import { clockTarget, formatElapsed } from '@/lib/clock';
+import { formatDate, formatHours, formatMoney, formatTime } from '@/lib/format';
+import { haptic } from '@/lib/haptics';
 import { nextOrCurrent } from '@/lib/schedule';
-import { addDays, todayYmd } from '@/lib/time';
+import { addDays, hmOf, todayYmd } from '@/lib/time';
 import { useActiveWorkplaces, useInstances, useNow, usePeriodData } from '@/store/selectors';
 import type { ShiftInstance } from '@/store/types';
 import { useStore } from '@/store/useStore';
@@ -57,6 +59,8 @@ export default function Home() {
         </Card>
       )}
 
+      {primary && <ClockCard target={clockTarget(upcoming, now)} />}
+
       {pd && primary && (
         <Animated.View entering={FadeInDown.delay(60).duration(350)}>
           <SectionHeader title="This pay period" action={<T v="caption" muted>{formatDate(pd.period.start, { month: 'short', day: 'numeric' })} – {formatDate(pd.period.end, { month: 'short', day: 'numeric' })}</T>} />
@@ -92,6 +96,33 @@ export default function Home() {
         </T>
       )}
     </Screen>
+  );
+}
+
+/** Clock in/out timer. Clocking out logs the real times on the shift. */
+function ClockCard({ target }: { target?: ShiftInstance }) {
+  const clock = useStore((s) => s.clock);
+  const clockIn = useStore((s) => s.clockIn);
+  const clockOut = useStore((s) => s.clockOut);
+  const timeFormat = useStore((s) => s.settings.timeFormat);
+  // ticks every second only inside this card
+  const now = useNow(1000);
+  const out = () => {
+    haptic('success');
+    if (!clockOut()) Alert.alert('Nothing logged', 'That was under a minute, so no time was recorded.');
+  };
+  return (
+    <Card style={{ marginTop: space.md, flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+      <View style={{ flex: 1 }}>
+        <T v="overline" muted>{clock ? `Clocked in at ${formatTime(hmOf(new Date(clock.startedAt)), timeFormat)}` : 'Time clock'}</T>
+        {clock ? (
+          <T v="display" accessibilityRole="timer" style={{ fontVariant: ['tabular-nums'] }}>{formatElapsed(now - clock.startedAt)}</T>
+        ) : (
+          <T v="headline" numberOfLines={1}>{target ? `Ready for ${target.title}` : 'Not clocked in'}</T>
+        )}
+      </View>
+      {clock ? <Button title="Clock out" kind="primary" onPress={out} /> : <Button title="Clock in" kind="secondary" icon="clock" onPress={() => clockIn(target?.id)} />}
+    </Card>
   );
 }
 

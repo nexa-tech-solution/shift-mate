@@ -70,6 +70,12 @@ export interface Rotation {
   exceptions: YMD[];
 }
 
+/** A running clock-in. `shiftId` is the scheduled shift (or rotation occurrence) it will be logged on. */
+export interface ClockSession {
+  startedAt: number; // epoch ms
+  shiftId?: ID;
+}
+
 export interface Paycheck {
   workplaceId: ID;
   periodStart: YMD;

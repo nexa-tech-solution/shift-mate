@@ -12,6 +12,7 @@ const state: DataState = {
   templates: [],
   rotations: [],
   paychecks: [],
+  clock: null,
   shifts: [
     { id: 'b', workplaceId: 'w', date: '2026-11-04', start: '09:00', end: '13:00', breakMin: 0, color: 'sun', title: 'Late', tz: 'UTC' },
     { id: 'a', workplaceId: 'w', date: '2026-11-03', start: '09:00', end: '17:30', breakMin: 30, color: 'sun', title: 'Open', tz: 'UTC', note: '=HYPERLINK("x") "quoted"' },

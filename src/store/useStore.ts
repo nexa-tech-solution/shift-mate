@@ -2,8 +2,9 @@ import Storage from 'expo-sqlite/kv-store';
 import { getCalendars, getLocales } from 'expo-localization';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { finishClock } from '@/lib/clock';
 import { deviceTz, startOfWeek, todayYmd } from '@/lib/time';
-import type { ID, Paycheck, Rotation, Settings, Shift, ShiftTemplate, Workplace, YMD } from './types';
+import type { ClockSession, ID, Paycheck, Rotation, Settings, Shift, ShiftTemplate, Workplace, YMD } from './types';
 
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
@@ -14,6 +15,7 @@ export interface DataState {
   shifts: Shift[];
   rotations: Rotation[];
   paychecks: Paycheck[];
+  clock: ClockSession | null;
 }
 
 interface Actions {
@@ -29,6 +31,9 @@ interface Actions {
   /** Remove one generated date from a rotation; optionally replace it with a standalone shift. */
   detachOccurrence: (rotationId: ID, date: YMD, replacement?: Shift) => void;
   setPaycheck: (p: Paycheck | { workplaceId: ID; periodStart: YMD; amount: null }) => void;
+  clockIn: (shiftId?: ID) => void;
+  /** Ends the session and logs it on its shift. False when it was too short to log. */
+  clockOut: () => boolean;
   completeOnboarding: (p: { workplace: Workplace; templates: ShiftTemplate[]; settings: Partial<Settings> }) => void;
   resetAll: () => void;
 }
@@ -52,6 +57,7 @@ const initialData = (): DataState => ({
   shifts: [],
   rotations: [],
   paychecks: [],
+  clock: null,
 });
 
 const upsert = <T extends { id: ID }>(list: T[], item: T) =>
@@ -59,7 +65,7 @@ const upsert = <T extends { id: ID }>(list: T[], item: T) =>
 
 export const useStore = create<DataState & Actions>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...initialData(),
       updateSettings: (p) => set((s) => ({ settings: { ...s.settings, ...p } })),
       upsertWorkplace: (w) => set((s) => ({ workplaces: upsert(s.workplaces, w) })),
@@ -94,6 +100,18 @@ export const useStore = create<DataState & Actions>()(
           const rest = s.paychecks.filter((x) => !(x.workplaceId === p.workplaceId && x.periodStart === p.periodStart));
           return { paychecks: p.amount == null ? rest : [...rest, p as Paycheck] };
         }),
+      clockIn: (shiftId) => set({ clock: { startedAt: Date.now(), shiftId } }),
+      clockOut: () => {
+        const s = get();
+        if (!s.clock) return false;
+        const tm = Object.fromEntries(s.templates.map((t) => [t.id, t]));
+        const done = finishClock(s, tm, s.clock, Date.now(), blankShift({ workplaceId: s.workplaces[0]?.id, date: todayYmd() }));
+        set({ clock: null });
+        if (!done) return false;
+        if (done.detach) s.detachOccurrence(done.detach.rotationId, done.detach.date, done.shift);
+        else s.upsertShift(done.shift);
+        return true;
+      },
       completeOnboarding: ({ workplace, templates, settings }) =>
         set((s) => ({
           workplaces: [workplace],
@@ -110,8 +128,8 @@ export const useStore = create<DataState & Actions>()(
         setItem: (k, v) => Storage.setItemSync(k, v),
         removeItem: (k) => Storage.removeItemSync(k),
       })),
-      partialize: ({ settings, workplaces, templates, shifts, rotations, paychecks }) => ({
-        settings, workplaces, templates, shifts, rotations, paychecks,
+      partialize: ({ settings, workplaces, templates, shifts, rotations, paychecks, clock }) => ({
+        settings, workplaces, templates, shifts, rotations, paychecks, clock,
       }),
       // future schema changes: bump version and transform here
       migrate: (persisted) => persisted as DataState,

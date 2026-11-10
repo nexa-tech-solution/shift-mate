@@ -11,6 +11,7 @@ import { ChoiceHost } from '@/components/choose';
 import { syncCalendar } from '@/lib/calendarSync';
 import { syncReminders } from '@/lib/notifications';
 import { initPurchases } from '@/lib/purchases';
+import { syncWidget } from '@/lib/widget';
 import { useStore } from '@/store/useStore';
 import { font, useTheme } from '@/theme';
 
@@ -32,6 +33,12 @@ useStore.subscribe((s, prev) => {
   calTimer = setTimeout(() => syncCalendar().catch(() => {}), 1500);
 });
 
+// Keep the Home Screen widget in step with the clock and the schedule.
+useStore.subscribe((s, prev) => {
+  if (s.clock === prev.clock && s.shifts === prev.shifts && s.rotations === prev.rotations && s.templates === prev.templates && s.workplaces === prev.workplaces && s.settings.timeFormat === prev.settings.timeFormat) return;
+  syncWidget(s);
+});
+
 export default function RootLayout() {
   const [loaded] = useFonts({
     BricolageGrotesque_500Medium,
@@ -51,6 +58,7 @@ export default function RootLayout() {
     syncReminders(useStore.getState()).catch(() => {});
     // the synced window rolls forward too
     syncCalendar().catch(() => {});
+    syncWidget(useStore.getState());
   }, []);
 
   useEffect(() => {
