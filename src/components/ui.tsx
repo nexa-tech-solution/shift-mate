@@ -163,13 +163,15 @@ export function Screen({
   children,
   scroll = true,
   padTop = true,
+  header,
   ...rest
-}: ScrollViewProps & { scroll?: boolean; padTop?: boolean }) {
+}: ScrollViewProps & { scroll?: boolean; padTop?: boolean; header?: ReactNode }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const pad = { paddingTop: padTop ? insets.top + space.sm : space.lg, paddingHorizontal: space.lg, paddingBottom: insets.bottom + 96 };
-  if (!scroll) return <View style={[{ flex: 1, backgroundColor: t.bg }, pad]}>{children}</View>;
-  return (
+  const pad = { paddingTop: header ? 0 : padTop ? insets.top + space.sm : space.lg, paddingHorizontal: space.lg, paddingBottom: insets.bottom + 96 };
+  const body = !scroll ? (
+    <View style={[{ flex: 1, backgroundColor: t.bg }, pad]}>{children}</View>
+  ) : (
     <ScrollView
       style={{ flex: 1, backgroundColor: t.bg }}
       contentContainerStyle={pad}
@@ -179,6 +181,14 @@ export function Screen({
     >
       {children}
     </ScrollView>
+  );
+  if (!header) return body;
+  // header sits outside the ScrollView so it stays put while content scrolls
+  return (
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <View style={{ paddingTop: insets.top + space.sm, paddingHorizontal: space.lg }}>{header}</View>
+      {body}
+    </View>
   );
 }
 

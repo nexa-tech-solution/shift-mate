@@ -83,12 +83,12 @@ export default function Calendar() {
   const entering = (dir > 0 ? SlideInRight : SlideInLeft).duration(240);
 
   return (
-    <Screen>
+    <Screen header={
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: space.md }}>
         <T v="display" accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1 }}>{title}</T>
         <IconButton icon="plus" tone="accent" label="Add shift on selected day" onPress={() => router.push({ pathname: '/shift/quick', params: { date: selected } })} />
       </View>
-
+    }>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, marginBottom: space.lg }}>
         <View style={{ flex: 1 }}>
           <Segmented<Mode> value={mode} onChange={setMode} accessibilityLabel="Calendar view" options={[{ value: 'month', label: 'Month' }, { value: 'week', label: 'Week' }]} />

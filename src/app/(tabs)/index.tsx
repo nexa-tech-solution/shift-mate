@@ -33,7 +33,7 @@ export default function Home() {
   const wpName = (id: string) => workplaces.find((w) => w.id === id)?.name;
 
   return (
-    <Screen>
+    <Screen header={
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: space.lg }}>
         <View style={{ flex: 1 }}>
           <T v="overline" muted>{formatDate(today, { weekday: 'long', month: 'long', day: 'numeric' })}</T>
@@ -41,7 +41,7 @@ export default function Home() {
         </View>
         <IconButton icon="plus" tone="accent" size={48} label="Add shift" onPress={() => router.push('/shift/quick')} />
       </View>
-
+    }>
       {next ? (
         <Animated.View entering={FadeInDown.duration(350)}>
           <TicketCard shift={next} now={now} workplace={wpName(next.workplaceId)} pay={pd?.perShift.get(next.id)?.pay} onPress={() => openShift(next)} />

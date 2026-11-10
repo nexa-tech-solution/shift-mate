@@ -33,8 +33,7 @@ export default function Pay() {
 
   if (!wp || !pd) {
     return (
-      <Screen>
-        <T v="display" accessibilityRole="header">Pay</T>
+      <Screen header={<T v="display" accessibilityRole="header">Pay</T>}>
         <EmptyState icon="work" title="No workplace yet" body="Add a workplace and hourly rate to see estimates." action={<Button title="Add workplace" onPress={() => router.push('/workplaces')} />} />
       </Screen>
     );
@@ -50,9 +49,7 @@ export default function Pay() {
   };
 
   return (
-    <Screen>
-      <T v="display" accessibilityRole="header" style={{ marginBottom: space.md }}>Pay</T>
-
+    <Screen header={<T v="display" accessibilityRole="header" style={{ marginBottom: space.md }}>Pay</T>}>
       {workplaces.length > 1 && (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: space.md }}>
           {workplaces.map((w) => (

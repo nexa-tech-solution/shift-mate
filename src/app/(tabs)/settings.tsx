@@ -94,9 +94,7 @@ export default function Settings() {
 
 
   return (
-    <Screen>
-      <T v="display" accessibilityRole="header">Settings</T>
-
+    <Screen header={<T v="display" accessibilityRole="header">Settings</T>}>
       {PAYWALL_ENABLED && (
         <>
       <Card style={{ marginTop: space.lg, backgroundColor: premium ? t.surface : t.ink, borderColor: premium ? t.line : t.ink, gap: space.md }}>
