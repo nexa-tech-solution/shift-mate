@@ -1,11 +1,11 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Linking, View } from 'react-native';
+import { Alert, Linking, Platform, Switch, View } from 'react-native';
 import { choose } from '@/components/choose';
 import { Icon } from '@/components/Icon';
 import { Button, Card, Group, Row, SectionHeader, Screen, Segmented, T, ToggleRow } from '@/components/ui';
-import { connectCalendar, disconnectCalendar, syncCalendar, writableCalendars } from '@/lib/calendarSync';
+import { connectCalendar, disconnectCalendar, writableCalendars } from '@/lib/calendarSync';
 import { EXPORT_FORMATS, exportAs, exportBackup } from '@/lib/export';
 import { CURRENCIES } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
@@ -52,28 +52,46 @@ export default function Settings() {
   };
 
   const fail = (e: unknown) => Alert.alert('Export failed', String((e as Error).message ?? e));
-  const calFail = (e: unknown) => Alert.alert('Calendar sync failed', String((e as Error).message ?? e));
+  const [calendarBusy, setCalendarBusy] = useState(false);
+  const toggleCalendar = async (enabled: boolean) => {
+    setCalendarBusy(true);
+    try {
+      if (!enabled) {
+        await disconnectCalendar();
+        return;
+      }
+      const calendars = await writableCalendars();
+      if (!calendars.length) {
+        Alert.alert('No calendars', 'Add a writable calendar on this device, then try again.');
+        return;
+      }
+      choose('Sync shifts to', calendars.map((c) => ({ label: `${c.title} · ${c.source.name}`, value: c.id })), (id) => {
+        const calendar = calendars.find((c) => c.id === id);
+        if (!calendar) return;
+        setCalendarBusy(true);
+        connectCalendar(calendar)
+          .catch((error: Error) => Alert.alert('Calendar sync failed', error.message))
+          .finally(() => setCalendarBusy(false));
+      });
+    } catch (error) {
+      Alert.alert('Calendar sync failed', String((error as Error).message ?? error));
+    } finally {
+      setCalendarBusy(false);
+    }
+  };
+  const openCalendar = async () => {
+    if (Platform.OS === 'web') return;
+    // iOS Calendar uses seconds since Apple's reference date (January 1, 2001).
+    const url = Platform.OS === 'ios'
+      ? `calshow:${Math.floor((Date.now() - Date.UTC(2001, 0, 1)) / 1000)}`
+      : `content://com.android.calendar/time/${Date.now()}`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Cannot open Calendar', 'Install or enable a calendar app on this device, then try again.');
+    }
+  };
 
-  const chooseCalendar = async () => {
-    const cals = await writableCalendars();
-    if (!cals.length) return Alert.alert('No calendars', 'Add a Google account to your phone first, then try again.');
-    choose('Add shifts to', cals.map((c) => ({ label: `${c.title} · ${c.source.name}`, value: c.id })), (id) => {
-      const c = cals.find((x) => x.id === id)!;
-      connectCalendar(c).then(() => haptic('success'), calFail);
-    }, { search: cals.length > 8 });
-  };
-  const pickCalendar = () => {
-    if (!settings.calendarSync) return chooseCalendar().catch(calFail);
-    choose(`Synced to ${settings.calendarSync.title}`, [
-      { label: 'Sync now', value: 'sync' },
-      { label: 'Change calendar', value: 'change' },
-      { label: 'Disconnect and remove events', value: 'off' },
-    ], (a) => {
-      if (a === 'sync') syncCalendar().then(() => haptic('success'), calFail);
-      else if (a === 'change') chooseCalendar().catch(calFail);
-      else disconnectCalendar().catch(calFail);
-    });
-  };
 
   return (
     <Screen>
@@ -142,10 +160,18 @@ export default function Settings() {
 
       <SectionHeader title="Calendar" />
       <Group>
-        <Row icon="calendar" label="Google Calendar" value={settings.calendarSync?.title ?? 'Off'} onPress={pickCalendar} last />
+        <Row icon="calendar" label="Calendar" onPress={openCalendar} last right={
+          <View onTouchEnd={(event) => event.stopPropagation()}><Switch
+            accessibilityLabel="Sync shifts to Calendar"
+            value={!!settings.calendarSync}
+            disabled={calendarBusy || Platform.OS === 'web'}
+            onValueChange={toggleCalendar}
+            trackColor={{ true: t.accent, false: t.surface2 }}
+          /></View>
+        } />
       </Group>
       <T v="caption" muted style={{ marginTop: space.sm, paddingHorizontal: space.xs }}>
-        Shifts are copied into a calendar on this phone. To see them in Google Calendar, add your Google account in your phone&apos;s Settings › Calendar › Accounts, then pick one of its calendars here.
+        Tap Calendar to open the app. Turn on sync to choose a calendar for your shifts. Turning it off removes the synced events.
       </T>
 
       <SectionHeader title="Your data" />
