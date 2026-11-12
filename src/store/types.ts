@@ -92,6 +92,8 @@ export interface Settings {
   onboarded: boolean;
   /** Device calendar (e.g. a Google account's) that shifts are copied into, and the events Shiftly created there. */
   calendarSync?: { calendarId: string; title: string; eventIds: string[] };
+  /** Shifts mirrored into a dedicated "Shiftly" calendar in the signed-in Google account (Calendar API). */
+  googleCalendar?: { calendarId?: string };
 }
 
 /** A concrete shift on the calendar — either a stored Shift or a generated rotation occurrence. */

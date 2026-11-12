@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#F4F0E8",
     "ios": {
-      "bundleIdentifier": "com.shiftmate.app",
+      "bundleIdentifier": "com.nexa.shiftly",
       "supportsTablet": true,
       "config": {
         "usesNonExemptEncryption": false
@@ -69,7 +69,10 @@
               "displayName": "Shift clock",
               "description": "Your clock-in timer and next shift.",
               "ios": {
-                "supportedFamilies": ["systemSmall", "systemMedium"]
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium"
+                ]
               }
             }
           ]

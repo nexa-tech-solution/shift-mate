@@ -5,8 +5,11 @@ import { Alert, Linking, Platform, Switch, View } from 'react-native';
 import { choose } from '@/components/choose';
 import { Icon } from '@/components/Icon';
 import { Button, Card, Group, Row, SectionHeader, Screen, Segmented, T, ToggleRow } from '@/components/ui';
+import { deleteAccount, signInWithGoogle, signOut, useAccount } from '@/lib/account';
 import { connectCalendar, disconnectCalendar, writableCalendars } from '@/lib/calendarSync';
 import { EXPORT_FORMATS, exportAs, exportBackup } from '@/lib/export';
+import { accountsEnabled } from '@/lib/firebase';
+import { connectGoogleCalendar, disconnectGoogleCalendar } from '@/lib/googleCalendar';
 import { CURRENCIES } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
 import { requestReminderPermission } from '@/lib/notifications';
@@ -79,6 +82,34 @@ export default function Settings() {
       setCalendarBusy(false);
     }
   };
+  const user = useAccount((s) => s.user);
+  const [accountBusy, setAccountBusy] = useState(false);
+  const busy = (fn: () => Promise<unknown>, title: string) => async () => {
+    setAccountBusy(true);
+    try {
+      await fn();
+    } catch (error) {
+      Alert.alert(title, String((error as Error).message ?? error));
+    } finally {
+      setAccountBusy(false);
+    }
+  };
+  const toggleGoogleCalendar = (on: boolean) =>
+    busy(async () => {
+      if (!on) return disconnectGoogleCalendar();
+      if (await connectGoogleCalendar()) haptic('success');
+    }, 'Google Calendar sync failed')();
+  const confirmSignOut = () =>
+    Alert.alert('Sign out?', 'Your shifts stay on this phone. Backup and Google Calendar sync stop until you sign in again.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign out', onPress: busy(signOut, 'Sign out failed') },
+    ]);
+  const confirmDelete = () =>
+    Alert.alert('Delete account?', 'Your cloud backup and account are deleted. Shifts on this phone stay. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: busy(async () => { if (await deleteAccount()) Alert.alert('Account deleted'); }, 'Delete account failed') },
+    ]);
+
   const openCalendar = async () => {
     if (Platform.OS === 'web') return;
     // iOS Calendar uses seconds since Apple's reference date (January 1, 2001).
@@ -114,6 +145,26 @@ export default function Settings() {
       {storeAvailable && !premium && (
         <Button title="Restore purchases" kind="ghost" loading={restoring} onPress={doRestore} style={{ marginTop: space.xs }} />
       )}
+        </>
+      )}
+
+      {accountsEnabled && (
+        <>
+          <SectionHeader title="Account" />
+          <Group>
+            {user ? (
+              <>
+                <Row icon="person" label={user.displayName ?? user.email ?? 'Google account'} value={user.displayName ? (user.email ?? undefined) : undefined} />
+                <Row icon="logout" label="Sign out" onPress={accountBusy ? undefined : confirmSignOut} />
+                <Row icon="trash" label="Delete account" danger onPress={accountBusy ? undefined : confirmDelete} last />
+              </>
+            ) : (
+              <Row icon="person" label="Sign in with Google" onPress={accountBusy ? undefined : busy(signInWithGoogle, 'Sign-in failed')} last />
+            )}
+          </Group>
+          <T v="caption" muted style={{ marginTop: space.sm, paddingHorizontal: space.xs }}>
+            {user ? 'Your shifts are backed up to your account and restored when you sign in on a new phone.' : 'Optional. Back up your shifts and sync them to Google Calendar. Shiftly works fully without an account.'}
+          </T>
         </>
       )}
 
@@ -158,7 +209,7 @@ export default function Settings() {
 
       <SectionHeader title="Calendar" />
       <Group>
-        <Row icon="calendar" label="Calendar" onPress={openCalendar} last right={
+        <Row icon="calendar" label="Device calendar" onPress={openCalendar} last={!accountsEnabled} right={
           <View onTouchEnd={(event) => event.stopPropagation()}><Switch
             accessibilityLabel="Sync shifts to Calendar"
             value={!!settings.calendarSync}
@@ -167,9 +218,21 @@ export default function Settings() {
             trackColor={{ true: t.accent, false: t.surface2 }}
           /></View>
         } />
+        {accountsEnabled && (
+          <Row icon="cloud" label="Google Calendar" last right={
+            <Switch
+              accessibilityLabel="Sync shifts to Google Calendar"
+              value={!!settings.googleCalendar}
+              disabled={accountBusy}
+              onValueChange={toggleGoogleCalendar}
+              trackColor={{ true: t.accent, false: t.surface2 }}
+            />
+          } />
+        )}
       </Group>
       <T v="caption" muted style={{ marginTop: space.sm, paddingHorizontal: space.xs }}>
-        Tap Calendar to open the app. Turn on sync to choose a calendar for your shifts. Turning it off removes the synced events.
+        Device calendar: tap to open it, turn on to pick a calendar on this phone.
+        {accountsEnabled ? ' Google Calendar: needs a Google sign-in and adds a separate "Shiftly" calendar to your account.' : ''} Turning sync off removes the synced events.
       </T>
 
       <SectionHeader title="Your data" />
@@ -201,7 +264,7 @@ export default function Settings() {
       </Group>
 
       <T v="caption" muted style={{ textAlign: 'center', marginTop: space.xl, paddingHorizontal: space.lg }}>
-        Shiftly {Constants.expoConfig?.version} · Your data stays on this device.{'\n'}Earnings are estimates, not payroll or tax advice.
+        Shiftly {Constants.expoConfig?.version} · {user ? 'Backed up to your Google account.' : 'Your data stays on this device.'}{'\n'}Earnings are estimates, not payroll or tax advice.
       </T>
     </Screen>
   );

@@ -34,6 +34,9 @@ const ICONS = {
   palette: { ios: 'paintpalette', android: 'palette' },
   globe: { ios: 'globe', android: 'language' },
   hand: { ios: 'hand.tap', android: 'touch_app' },
+  person: { ios: 'person.crop.circle', android: 'account_circle' },
+  cloud: { ios: 'cloud', android: 'cloud' },
+  logout: { ios: 'rectangle.portrait.and.arrow.right', android: 'logout' },
 } as const satisfies Record<string, SymbolViewProps['name']>;
 
 export type IconName = keyof typeof ICONS;

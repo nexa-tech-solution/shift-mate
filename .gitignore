@@ -44,3 +44,5 @@ example
 
 .env
 ._*
+GoogleService-Info.plist
+google-services.json
