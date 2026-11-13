@@ -5,19 +5,21 @@ import { getFirestore } from 'firebase/firestore';
 import Storage from 'expo-sqlite/kv-store';
 import { Platform } from 'react-native';
 
-const env = process.env;
+// written out in full: production builds only inline literal process.env.EXPO_PUBLIC_* reads, not reads through a variable
+const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 const firebaseConfig = {
-  apiKey: env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  appId: env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
 /** Accounts are optional: with no Firebase/Google keys the app stays fully local and hides sign-in. */
 export const accountsEnabled =
   Platform.OS !== 'web' &&
-  !!(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId && env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) &&
-  (Platform.OS !== 'ios' || !!env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID);
+  !!(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId && webClientId) &&
+  (Platform.OS !== 'ios' || !!iosClientId);
 
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.app.created';
 
@@ -33,8 +35,8 @@ export const db = app ? getFirestore(app) : undefined;
 
 if (accountsEnabled) {
   GoogleSignin.configure({
-    webClientId: env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID, // needed for the idToken Firebase verifies
-    iosClientId: env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    webClientId, // needed for the idToken Firebase verifies
+    iosClientId,
     scopes: ['email', 'profile'], // the calendar scope is asked for only when Google Calendar sync is turned on
   });
 }
