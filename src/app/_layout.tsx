@@ -6,6 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ChoiceHost } from '@/components/choose';
 import { scheduleBackup } from '@/lib/account';
@@ -104,7 +105,7 @@ export default function RootLayout() {
             <Stack.Screen name="shift/[id]" options={{ presentation: 'modal', headerShown: false }} />
             <Stack.Screen
               name="shift/quick"
-              options={{ presentation: 'formSheet', headerShown: false, sheetAllowedDetents: [0.6, 0.92], sheetGrabberVisible: true, sheetCornerRadius: 28 }}
+              options={{ presentation: 'formSheet', headerShown: false, sheetAllowedDetents: Platform.OS === 'ios' && Platform.isPad ? [1] : [0.6, 0.92], sheetGrabberVisible: true, sheetCornerRadius: 28 }}
             />
             <Stack.Screen name="templates" options={{ title: 'Shift templates' }} />
             <Stack.Screen name="template/[id]" options={{ presentation: 'modal', headerShown: false }} />
