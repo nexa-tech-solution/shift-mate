@@ -1,4 +1,3 @@
-import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Linking, Platform, Switch, View } from 'react-native';
@@ -9,7 +8,7 @@ import { deleteAccount, signInWithGoogle, signOut, useAccount } from '@/lib/acco
 import { connectCalendar, disconnectCalendar, writableCalendars } from '@/lib/calendarSync';
 import { EXPORT_FORMATS, exportAs, exportBackup } from '@/lib/export';
 import { accountsEnabled } from '@/lib/firebase';
-import { connectGoogleCalendar, disconnectGoogleCalendar } from '@/lib/googleCalendar';
+import { connectGoogleCalendar, disconnectGoogleCalendar, syncGoogleCalendar } from '@/lib/googleCalendar';
 import { CURRENCIES } from '@/lib/format';
 import { haptic } from '@/lib/haptics';
 import { requestReminderPermission } from '@/lib/notifications';
@@ -55,9 +54,11 @@ export default function Settings() {
   };
 
   const fail = (e: unknown) => Alert.alert('Export failed', String((e as Error).message ?? e));
-  const [calendarBusy, setCalendarBusy] = useState(false);
+  // the switch shows where it is heading while work runs, instead of snapping back until the store catches up
+  const [devicePending, setDevicePending] = useState<boolean | null>(null);
   const toggleCalendar = async (enabled: boolean) => {
-    setCalendarBusy(true);
+    setDevicePending(enabled);
+    let picking = false;
     try {
       if (!enabled) {
         await disconnectCalendar();
@@ -68,18 +69,18 @@ export default function Settings() {
         Alert.alert('No calendars', 'Add a writable calendar on this device, then try again.');
         return;
       }
+      picking = true;
       choose('Sync shifts to', calendars.map((c) => ({ label: `${c.title} · ${c.source.name}`, value: c.id })), (id) => {
         const calendar = calendars.find((c) => c.id === id);
-        if (!calendar) return;
-        setCalendarBusy(true);
+        if (!calendar) return setDevicePending(null);
         connectCalendar(calendar)
           .catch((error: Error) => Alert.alert('Calendar sync failed', error.message))
-          .finally(() => setCalendarBusy(false));
-      });
+          .finally(() => setDevicePending(null));
+      }, { onCancel: () => setDevicePending(null) });
     } catch (error) {
       Alert.alert('Calendar sync failed', String((error as Error).message ?? error));
     } finally {
-      setCalendarBusy(false);
+      if (!picking) setDevicePending(null);
     }
   };
   const user = useAccount((s) => s.user);
@@ -94,11 +95,21 @@ export default function Settings() {
       setAccountBusy(false);
     }
   };
-  const toggleGoogleCalendar = (on: boolean) =>
-    busy(async () => {
-      if (!on) return disconnectGoogleCalendar();
-      if (await connectGoogleCalendar()) haptic('success');
-    }, 'Google Calendar sync failed')();
+  const [googlePending, setGooglePending] = useState<boolean | null>(null);
+  const toggleGoogleCalendar = async (on: boolean) => {
+    setGooglePending(on);
+    try {
+      if (!on) await disconnectGoogleCalendar();
+      else if (await connectGoogleCalendar()) {
+        haptic('success');
+        syncGoogleCalendar().catch((error) => Alert.alert('Google Calendar sync failed', String((error as Error).message ?? error)));
+      }
+    } catch (error) {
+      Alert.alert('Google Calendar sync failed', String((error as Error).message ?? error));
+    } finally {
+      setGooglePending(null);
+    }
+  };
   const confirmSignOut = () =>
     Alert.alert('Sign out?', 'Your shifts stay on this phone. Backup and Google Calendar sync stop until you sign in again.', [
       { text: 'Cancel', style: 'cancel' },
@@ -212,8 +223,8 @@ export default function Settings() {
         <Row icon="calendar" label="Device calendar" onPress={openCalendar} last={!accountsEnabled} right={
           <View onTouchEnd={(event) => event.stopPropagation()}><Switch
             accessibilityLabel="Sync shifts to Calendar"
-            value={!!settings.calendarSync}
-            disabled={calendarBusy || Platform.OS === 'web'}
+            value={devicePending ?? !!settings.calendarSync}
+            disabled={devicePending !== null || Platform.OS === 'web'}
             onValueChange={toggleCalendar}
             trackColor={{ true: t.accent, false: t.surface2 }}
           /></View>
@@ -222,8 +233,8 @@ export default function Settings() {
           <Row icon="cloud" label="Google Calendar" last right={
             <Switch
               accessibilityLabel="Sync shifts to Google Calendar"
-              value={!!settings.googleCalendar}
-              disabled={accountBusy}
+              value={googlePending ?? !!settings.googleCalendar}
+              disabled={googlePending !== null || accountBusy}
               onValueChange={toggleGoogleCalendar}
               trackColor={{ true: t.accent, false: t.surface2 }}
             />
@@ -231,8 +242,8 @@ export default function Settings() {
         )}
       </Group>
       <T v="caption" muted style={{ marginTop: space.sm, paddingHorizontal: space.xs }}>
-        Device calendar: tap to open it, turn on to pick a calendar on this phone.
-        {accountsEnabled ? ' Google Calendar: needs a Google sign-in and adds a separate "Shiftly" calendar to your account.' : ''} Turning sync off removes the synced events.
+        Device calendar puts your shifts in a calendar on this phone, like iCloud or Outlook.
+        {accountsEnabled ? ' Google Calendar puts them in a new "Shiftly" calendar in your Google account, so they show up on all your devices.' : ''} Turn one off and its shifts are removed from that calendar.
       </T>
 
       <SectionHeader title="Your data" />
@@ -262,10 +273,6 @@ export default function Settings() {
           last
         />
       </Group>
-
-      <T v="caption" muted style={{ textAlign: 'center', marginTop: space.xl, paddingHorizontal: space.lg }}>
-        Shiftly {Constants.expoConfig?.version} · {user ? 'Backed up to your Google account.' : 'Your data stays on this device.'}{'\n'}Earnings are estimates, not payroll or tax advice.
-      </T>
     </Screen>
   );
 }

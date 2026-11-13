@@ -7,16 +7,17 @@ import { font, radius, space, useTheme } from '@/theme';
 import { T } from './ui';
 
 type Opt = { label: string; value: string | number };
-const useChoice = create<{ title: string; options: Opt[]; search?: boolean; onPick?: (v: Opt['value']) => void }>(() => ({ title: '', options: [] }));
+const useChoice = create<{ title: string; options: Opt[]; search?: boolean; onPick?: (v: Opt['value']) => void; onCancel?: () => void }>(() => ({ title: '', options: [] }));
 
 /** Single choice: native action sheet on iOS, bottom sheet on Android (Alert caps at 3 buttons) or when `search` is on. */
-export function choose<V extends string | number>(title: string, options: { label: string; value: V }[], onPick: (v: V) => void, opts: { search?: boolean } = {}) {
+export function choose<V extends string | number>(title: string, options: { label: string; value: V }[], onPick: (v: V) => void, opts: { search?: boolean; onCancel?: () => void } = {}) {
   if (Platform.OS === 'ios' && !opts.search) {
     ActionSheetIOS.showActionSheetWithOptions({ title, options: [...options.map((o) => o.label), 'Cancel'], cancelButtonIndex: options.length }, (i) => {
       if (i < options.length) onPick(options[i].value);
+      else opts.onCancel?.();
     });
   } else {
-    useChoice.setState({ title, options, search: opts.search, onPick: onPick as (v: Opt['value']) => void });
+    useChoice.setState({ title, options, search: opts.search, onPick: onPick as (v: Opt['value']) => void, onCancel: opts.onCancel });
   }
 }
 
@@ -24,18 +25,19 @@ export function choose<V extends string | number>(title: string, options: { labe
 export function ChoiceHost() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const { title, options, search, onPick } = useChoice();
+  const { title, options, search, onPick, onCancel } = useChoice();
   const [query, setQuery] = useState('');
-  const close = () => {
-    useChoice.setState({ onPick: undefined });
+  const close = (picked = false) => {
+    if (!picked) onCancel?.();
+    useChoice.setState({ onPick: undefined, onCancel: undefined });
     setQuery('');
   };
   const q = query.trim().toLowerCase();
   const shown = q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options;
   return (
-    <Modal visible={!!onPick} transparent animationType="slide" onRequestClose={close} statusBarTranslucent navigationBarTranslucent>
+    <Modal visible={!!onPick} transparent animationType="slide" onRequestClose={() => close()} statusBarTranslucent navigationBarTranslucent>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={close} accessibilityLabel="Close" />
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={() => close()} accessibilityLabel="Close" />
         <View style={{ backgroundColor: t.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingTop: space.lg, paddingBottom: insets.bottom + space.md, maxHeight: '70%' }}>
           <T v="headline" style={{ paddingHorizontal: space.xl, paddingBottom: space.sm }} accessibilityRole="header">{title}</T>
           {search && (
@@ -61,7 +63,7 @@ export function ChoiceHost() {
                 onPress={() => {
                   haptic('select');
                   onPick?.(o.value);
-                  close();
+                  close(true);
                 }}
                 style={{ minHeight: 52, justifyContent: 'center', paddingHorizontal: space.xl }}
               >

@@ -273,9 +273,12 @@ function DailyChart({ pd, money }: { pd: PeriodData; money: (n: number) => strin
       </View>
       <View style={{ flexDirection: 'row', gap }} importantForAccessibility="no-hide-descendants">
         {days.map((d, k) => (
-          <T key={d} v="caption" color={d === today ? t.accent : t.ink3} numberOfLines={1} style={{ flex: 1, textAlign: 'center', fontSize: 10 }}>
-            {k % labelEvery === 0 ? (days.length > 7 ? String(+d.slice(8)) : formatDate(d, { weekday: 'narrow' })) : ''}
-          </T>
+          // fixed-width label centred on its column, so "22" fits even when a month makes columns a few px wide
+          <View key={d} style={{ flex: 1, alignItems: 'center' }}>
+            <T v="caption" color={d === today ? t.accent : t.ink3} numberOfLines={1} style={{ width: 24, textAlign: 'center', fontSize: 10 }}>
+              {k % labelEvery === 0 ? (days.length > 7 ? String(+d.slice(8)) : formatDate(d, { weekday: 'narrow' })) : ''}
+            </T>
+          </View>
         ))}
       </View>
       <View style={{ flexDirection: 'row', gap: space.lg }}>

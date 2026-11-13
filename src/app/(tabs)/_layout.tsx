@@ -11,6 +11,8 @@ export default function TabLayout() {
     <NativeTabs
       tintColor={t.accent}
       backgroundColor={t.bg}
+      // iOS 18 and earlier: with our own insets UIKit always thinks content sits at the edge and draws the bar clear over it
+      disableTransparentOnScrollEdge
       indicatorColor={t.surface2}
       labelStyle={{ fontFamily: font.medium, color: t.ink2, selected: { color: t.ink } }}
     >
